@@ -22,5 +22,5 @@ jobs:
         go-version: '1.21.4'
 
     - name: Build
-      run: go build -C ./server/ -v
+      run: go build -C ./server/ -v -o jest_scanner
 
