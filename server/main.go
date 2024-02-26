@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -71,7 +72,7 @@ func startWebsocket(w http.ResponseWriter, r *http.Request) {
 }
 
 func recieveAndDecodeMsg(ws *websocket.Conn) error {
-  _, p, err := ws.ReadMessage()
+  messageType, p, err := ws.ReadMessage()
   if err != nil {
     return err
   }
@@ -89,8 +90,15 @@ func recieveAndDecodeMsg(ws *websocket.Conn) error {
         return err
       }
       log.Println("Calling set up")
-      scanner.SetUp(configuration)
-      log.Println(configuration)
+      testTree := scanner.SetUp(configuration)
+      testTreeJson, err := json.Marshal(testTree)
+      if err != nil {
+        log.Println("Error", err)
+      }
+      err = ws.WriteMessage(messageType, testTreeJson)
+      if err != nil {
+        log.Println("Error sending message", err)
+      }
     case "runcmd":
       cmd, err := message.ParseRunCmd(msg.Data)
       if err != nil {

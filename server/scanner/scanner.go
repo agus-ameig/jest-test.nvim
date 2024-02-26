@@ -12,22 +12,22 @@ import (
 )
 
 type Test struct {
-  Name      string
-  Line      int
+  Name      string  `json:"name"`
+  Line      int     `json:"line"`
 }
 
 type TestCase struct {
-  Name      string
-  Line      int
-  Tests     []Test
+  Name      string  `json:"name"`
+  Line      int     `json:"line"`
+  Tests     []Test  `json:"tests"`
 }
 
 type TestTree struct {
-  Name      string
-  Path      string
-  Type      string
-  TestCases []TestCase
-  Children  []TestTree
+  Name      string        `json:"name"`
+  Path      string        `json:"path"`
+  Type      string        `json:"type"`
+  TestCases []TestCase    `json:"test_cases"`
+  Children  []TestTree    `json:"children"`
 }
 
 func (t TestTree) IsDir() bool {
@@ -46,19 +46,19 @@ var adapterDetails = AdapterDetails{
 
 var testTree TestTree
 
-func SetUp(configuration message.Configuration) {
+func SetUp(configuration message.Configuration) *TestTree {
   log.Println("Setting up...")
   d, err := os.Open(configuration.Dir)
   if err != nil {
     log.Println("Error opening directory", err)
-    return
+    return nil
   }
   defer d.Close()
 
   files, err := d.ReadDir(-1)
   if err != nil {
     log.Println("Error reading directory contents:", err)
-    return
+    return nil
   }
   tree, err := filter(files, configuration.Dir, configuration)
   var finalTree []TestTree
@@ -68,7 +68,7 @@ func SetUp(configuration message.Configuration) {
       child, err = findInDir(&item, configuration)
       if err != nil {
         log.Println("Error in children", err)
-        return
+        return nil
       }
     }
     finalTree = append(finalTree, *child)
@@ -81,6 +81,7 @@ func SetUp(configuration message.Configuration) {
     Children: finalTree,
   }
   log.Println("This is the test tree", testTree)
+  return &testTree
 }
 
 func filter(files []fs.DirEntry, parentPath string, configuration message.Configuration) ([]TestTree, error) {
