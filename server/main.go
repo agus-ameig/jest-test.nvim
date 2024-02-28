@@ -4,90 +4,66 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
-
-	"github.com/gorilla/websocket"
+	"net"
 
 	"jest/scanner/message"
 	"jest/scanner/scanner"
 )
 
-var upgrader = websocket.Upgrader{
-  ReadBufferSize: 1024,
-  WriteBufferSize: 1024,
-}
 var configuration message.Configuration
 
 func main() {
-  http.HandleFunc("/", ping)
-  http.HandleFunc("/test", testWebsocket)
-  http.HandleFunc("/scanner", startWebsocket)
-  log.Fatal(http.ListenAndServe(":8080", nil))
-}
-
-
-func ping(w http.ResponseWriter, r *http.Request) {
-  fmt.Fprintf(w,"I'm alive")
-}
-
-func testWebsocket(w http.ResponseWriter, r *http.Request) {
-  conn, err := upgrader.Upgrade(w, r, nil)
+  ln, err := net.Listen("tcp", ":8080")
   if err != nil {
-    log.Println(err)
+    log.Println("Error starting: ", err)
     return
   }
 
+  for {
+    conn, err := ln.Accept()
+    if err != nil {
+      log.Println("Could not accept", err)
+      continue
+    }
+    go handleConnection(conn)
+  }
+
+}
+
+func handleConnection(conn net.Conn) {
   defer conn.Close()
 
-  for {
-    messageType, p, err := conn.ReadMessage()
-    if err != nil {
-      log.Println(err)
-      return
-    }
+  buf := make([]byte, 8)
+  _, err := conn.Read(buf)
 
-    if err := conn.WriteMessage(messageType, p); err != nil {
-      log.Println(err)
-      return
-    }
-  }
-}
-
-func startWebsocket(w http.ResponseWriter, r *http.Request) {
-  ws, err := upgrader.Upgrade(w, r, nil)
   if err != nil {
-    log.Println(err)
+    fmt.Println("Error reading: ", err)
     return
   }
 
-  defer ws.Close()
-
-  for {
-    err = recieveAndDecodeMsg(ws)
-    if err != nil {
-      log.Println(err)
-      return
-    }
+  msgHeader, err := message.ParseMessage(buf)
+  fmt.Printf("Received: version: %d, type: %d, payload length: %d\n", msgHeader.Version, msgHeader.Type, msgHeader.Length)
+  payload := make([]byte, msgHeader.Length)
+  _, err = conn.Read(payload)
+  if err != nil {
+    log.Println("Error reading data: ", err)
   }
+
+  fmt.Printf("Payload: %s", payload)
+  msg,err := recieveAndDecodeMsg(msgHeader, payload)
+  responseHeader := message.CreateMessageHeader(0x01, message.Response, uint32(len(msg)))
+  response := append(responseHeader, msg...)
+  log.Println("%s", msg)
+  conn.Write(response)
 }
 
-func recieveAndDecodeMsg(ws *websocket.Conn) error {
-  messageType, p, err := ws.ReadMessage()
-  if err != nil {
-    return err
-  }
 
-  msg, err := message.ParseMessage(p)
-  if err != nil {
-    return err
-  }
-  log.Println(msg)
-
-  switch msg.Type {
-    case "config":
-      configuration, err = message.ParseConfig(msg.Data)
+func recieveAndDecodeMsg(header message.MessageHeader, payload []byte) ([]byte, error) {
+  switch header.Type {
+    case message.Config:
+      configuration, err := message.ParseConfig(payload)
       if err != nil {
-        return err
+        return []byte{}, err
       }
       log.Println("Calling set up")
       testTree := scanner.SetUp(configuration)
@@ -95,19 +71,16 @@ func recieveAndDecodeMsg(ws *websocket.Conn) error {
       if err != nil {
         log.Println("Error", err)
       }
-      err = ws.WriteMessage(messageType, testTreeJson)
+      return testTreeJson, err
+    case message.RunCmd:
+      _, err := message.ParseRunCmd(payload)
       if err != nil {
-        log.Println("Error sending message", err)
+        return []byte{}, err
       }
-    case "runcmd":
-      cmd, err := message.ParseRunCmd(msg.Data)
-      if err != nil {
-        return err
-      }
-      log.Println(cmd)
+      return []byte{}, nil
     default:
       log.Println("Type not recognized")
   }
 
-  return nil
+  return []byte{}, nil
 }

@@ -162,7 +162,7 @@ func findTestsInFile(path string) ([]TestCase, error) {
   testCasePattern := regexp.MustCompile(adapterDetails.TestCasePattern)
   testPattern := regexp.MustCompile(adapterDetails.TestPattern)
   namePattern := regexp.MustCompile("[\"']([^\"']+)[\"']")
-  var result []TestCase
+  result  := []TestCase{}
   var currentTestCase TestCase
   scanner := bufio.NewScanner(file)
   lineNumber := 1
