@@ -31,9 +31,9 @@ function M.getMessage(message)
   local type = string.sub(message, 2,2)
   local payload = vim.json.decode(string.sub(message, 9))
   return {
-    version,
-    type,
-    payload
+    version = version,
+    type = type,
+    payload = payload
   }
 end
 

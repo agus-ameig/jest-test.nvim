@@ -1,4 +1,4 @@
-local network_utils = require("lua.network.network_utils")
+local network_utils = require("lua.jest-test.network.network_utils")
 
 local NetworkAdapter = {}
 NetworkAdapter.__index = NetworkAdapter
